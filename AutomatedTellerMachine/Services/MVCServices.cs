@@ -29,16 +29,5 @@ namespace AutomatedTellerMachine.MVCServices
             checkingAccount.Balance += db.Transactions.Where(t => t.Id == transaction.Id).Sum(c => c.Amount);
             db.SaveChanges();
         }
-    }
-
-    /*public class TransferFundsServices
-    {
-        public TransferFundsServices(TransferFundsViewModel tf, IApplicationDbContext dbContext, int excludedAccountId)
-        {
-            tf._destinationAccountList = (  from data in dbContext.CheckingAccounts
-                                            where data.Id != excludedAccountId
-                                            select data).ToList();
-            tf.SourceAccountId = excludedAccountId;
-        }
-    }*/
+    }    
 }

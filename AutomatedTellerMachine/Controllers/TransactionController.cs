@@ -61,7 +61,7 @@ namespace AutomatedTellerMachine.Controllers
 
             if (ModelState.IsValid)
             {
-                transaction.Amount = 0 - transaction.Amount;
+                transaction.Amount = -transaction.Amount; //amount to deduct
                 db.Transactions.Add(transaction);                
                 db.SaveChanges();
                 var service = new CheckingAccountServices(db);
@@ -82,35 +82,47 @@ namespace AutomatedTellerMachine.Controllers
         [HttpPost]
         public ActionResult TransferFunds(TransferFundsViewModel transferFunds)
         {
+            //Check for available funds
             CheckingAccount sourceAccount = db.CheckingAccounts.Find(transferFunds.SourceAccountId);
             if (sourceAccount.Balance < transferFunds.Amount)
             {
-                ModelState.AddModelError("Amount", "Insufficient funds in source account");
-                return View(transferFunds);
+                ModelState.AddModelError("Amount", "Insufficient funds in source account");                
             }
 
-            //Add source account transaction
-            Transaction srcTransaction = new Transaction();
-            srcTransaction.Account = sourceAccount;
-            srcTransaction.CheckingAccountId = sourceAccount.Id;
-            srcTransaction.Amount = 0 - transferFunds.Amount;
-            db.Transactions.Add(srcTransaction);
+            //Check if destination account exists
+            CheckingAccount destAccount = db.CheckingAccounts.Where(
+                c => c.Id == transferFunds.DestinationAccountId).FirstOrDefault();
+            if (destAccount == null)
+            {
+                ModelState.AddModelError("DestinationAccountId", "Destination account does not exist");
+            }
 
-            //Add destination account transaction
-            Transaction destTransaction = new Transaction();
-            CheckingAccount destAccount = db.CheckingAccounts.Find(transferFunds.DestinationAccountId);
-            destTransaction.Account = destAccount;
-            destTransaction.CheckingAccountId = destAccount.Id;
-            destTransaction.Amount = transferFunds.Amount;
-            db.Transactions.Add(destTransaction);
+            if (ModelState.IsValid)
+            {
+                //Add source account transaction
+                Transaction srcTransaction = new Transaction();
+                srcTransaction.Account = sourceAccount;
+                srcTransaction.CheckingAccountId = sourceAccount.Id;
+                srcTransaction.Amount = -transferFunds.Amount; //amount to deduct
+                db.Transactions.Add(srcTransaction);
 
-            //Save to db and update balances
-            db.SaveChanges();
-            var service = new CheckingAccountServices(db);
-            service.UpdateBalance(srcTransaction);
-            service.UpdateBalance(destTransaction);
+                //Add destination account transaction
+                Transaction destTransaction = new Transaction();
+                destTransaction.Account = destAccount;
+                destTransaction.CheckingAccountId = destAccount.Id;
+                destTransaction.Amount = transferFunds.Amount;
+                db.Transactions.Add(destTransaction);
 
-            return RedirectToAction("Index", "Home");            
+                //Save to db and update balance for both accounts
+                db.SaveChanges();
+                var service = new CheckingAccountServices(db);
+                service.UpdateBalance(srcTransaction);
+                service.UpdateBalance(destTransaction);
+
+                return PartialView("_TransferSuccess", transferFunds);
+            }
+
+            return PartialView("_TransferForm", transferFunds);            
         }
     }
 }
